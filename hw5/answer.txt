@@ -1,0 +1,10 @@
+12.18
+A. unsafe
+B. safe
+C. unsafe
+
+12.24
+The RIO package functions are implicitly reentrant because parameters are only passed by pointers and/or non-global/static data. 
+The functions are not explicitly reentrant because they utilize pointers. 
+The functions may not be truly reentrant if the caller passes the same address parameters to multiple calls.
+
