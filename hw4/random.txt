@@ -1,0 +1,39 @@
+2.89
+A.
+Yes.
+(float) x == (float) dx 
+(float) x == (float) (double) x
+casting the integer to float is equivalent to casting the integer to double float and then float, with respect to any rounding that may occur
+
+B.
+No
+x = int_min
+y = a postive number
+dx-dy == (double) (x-y)
+will negative overflow and return false
+
+C.
+Yes
+(dx + dy) + dz == dx + (dy + dz)
+doubles are big enough to not lose precision with integer values
+
+D.
+No
+(dx * dy) * dz == dx * (dy * dz)
+rounding for large numbers will cause issues.
+dx = int_max; dy = int_max -1; dz = int_max -2;
+
+E.
+No
+x = 0
+z = 1
+dx / dx == dz / dz
+NaN == 1
+division by zero will go to NaN
+
+
+
+
+
+
+

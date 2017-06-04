@@ -1,0 +1,32 @@
+1.
+4*dfffffffdceaced0+2 = 37FFFFFFF73AB3B42 -> 7FFFFFFF73AB3B42
+"547920	48 8d 04 ad 02 00 00 00	lea 0x2(,%rbp,4),%rax" causes the problem because arithmetic overflows and is truncated to fit into 64bits
+
+2.
+most-negative-fixnum = -2305843009213693952 = -(2^61)
+The remaining 2 bits are used as tags.
+
+3.
+most-positive-fixnum * most-positive-fixnum * most-positive-fixnum * most-positive-fixnum = 1
+2305843009213693951 * 2305843009213693951 * 2305843009213693951 * 2305843009213693951 = 1
+1111111111111111111111111111111111111111111111111111111111111 (61 1's) * 1111111111111111111111111111111111111111111111111111111111111 (61 1's) * 1111111111111111111111111111111111111111111111111111111111111 (61 1's) * 1111111111111111111111111111111111111111111111111111111111111 (61 1's) = 1
+
+1111111111111111111111111111111111111111111111111111111111111 (61 1's) * 1111111111111111111111111111111111111111111111111111111111111 (61 1's) =
+11111111111111111111111111111111111111111111111111111111111100000000000000000000000000000000000000000000000000000000000001 -> 0000000000000000000000000000000000000000000000000000000000001
+
+0000000000000000000000000000000000000000000000000000000000001 * 0000000000000000000000000000000000000000000000000000000000001 = 1
+The number overflows and is truncated. The remaining number is 1. Doing this twice gives 1*1=1.
+
+4.
+If emacs were compiled with -fwrapv, there would be no difference because it already truncates during overflow, similar to the behavior of -fwrapv. The arithmetic may still be incorrect due to wraparound.
+
+5.
+emacs -Q -batch -eval '(print (format-time-string "%Y-%m-%d %H:%M:%S %Z" nil (concat (make-string 1000 ?X) "0")))'
+3rd arg of format-time-string is 1000 X's with a 0, likely causing a buffer overflow error.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x00007ffff173949b in __strcpy_sse2_unaligned () from /lib64/libc.so.6
+=> 0x00007ffff173949b <__strcpy_sse2_unaligned+411>:	f3 0f 7f 7f f0	movdqu %xmm7,-0x10(%rdi)
+rdi is holding "0x14bc00a" which is probably a bad address, somewhere in nonreadable/writable memory. also, the memory -0x10(%rdi) may not be 128bits.
+
+

@@ -1,0 +1,49 @@
+Problem 3.67
+A.
+104 |
+...	|
+32	|
+24	| z 
+16	| z 
+8	| y 
+0	| x 
+
+B.
+Passes %rdi and passes where the struct is, so strA s
+
+C.
+using 24(%rsp), 16(%rsp), and 8(%rsp)
+
+D.
+using (%rdi), 8(%rdi), 16(%rdi) where %rdi = 64(%rsp) where %rsp is in the frame of reference for eval
+
+E.
+104 |
+80	| z
+72	| x
+64	| y
+...	|
+32	|
+24	| z 
+16	| address of z 
+8	| y 
+0	| x 
+
+F.
+for passing structure values as function arguments, put the values on the stack and use %rsp with offsets
+for returning them as function results, put them on the stack and use %rsp with offsets
+
+Problem 3.70
+A.
+e1.p 	0
+e1.y	8
+e2.x	0
+e2.next	8
+
+B.
+16
+
+C.
+void proc (union ele *up) {
+	up->e2.x = *(up->e2.next->e1.p) - up->e2.next->e1.y 
+}

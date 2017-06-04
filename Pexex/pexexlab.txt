@@ -1,0 +1,25 @@
+"ssh (username)" to login into the server, type password after
+
+"vim ~eggert/src/emacs-25.2/src/data.c" to see the source code where Ftimes is found
+
+"gdb ~eggert/bin64/bin/emacs-25.2" to use gdb on emacs
+
+"r -Q -batch -eval '(print (* 1250284240 -1844255039))'" to start the program (within gdb)
+
+"set disassemble-next-line on" to show assembly for each line (within gdb)
+
+"info registers" to show the values of each register (within gdb)
+
+"break *0xf55555" to insert a break at memory f55555 (within gdb)
+
+"break Ftimes" to insert a break when Ftimes is called (within gdb)
+
+"stepi" to step into functions, one instruction at a time (within gdb)
+
+"run" to run the program (within gdb)
+
+"continue" to finish running the program without stops after a break (within gdb)
+
+"disas" use it with some address argument to see assembly (within gdb)
+
+"quit" to exit gdb (within gdb)

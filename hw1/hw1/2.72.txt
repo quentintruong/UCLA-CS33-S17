@@ -1,0 +1,4 @@
+A.
+because sign_t is unsigned, will perform arithmetic according to unsigned rules, so the answer can only be positive
+B.
+if (maxbytes >= sizeof(val))
