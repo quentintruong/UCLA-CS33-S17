@@ -1,0 +1,94 @@
+===Setup===
+"scp /Users/quentintruong/Desktop/openmplab.tgz quentin@lnxsrv09.seas.ucla.edu:Desktop/" - transfer tgz from desktop to lnxsrv09
+"export PATH=/usr/local/cs/bin:$PATH" - update gcc
+"gcc --version" - check gcc version
+"tar xzf openmplab.tgz" - extract and uncompress
+"make seq" - normal compile
+=Original= (Note: running ./seq multiple times reveals extreme variance in runtime)
+FUNC TIME : 0.469670
+TOTAL TIME : 2.318811
+=End=
+===End===
+
+===GPROF setup===
+"make seq GPROF=1" - GPROF compile
+"gprof seq | less" - run seq and view selected output in 'less'
+=less contents for unmodified f=
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  ms/call  ms/call  name    
+ 59.01      0.33     0.33       15    22.03    23.42  func1
+ 19.67      0.44     0.11  5177344     0.00     0.00  rand2
+  7.15      0.48     0.04                             filter
+  3.58      0.50     0.02   491520     0.00     0.00  findIndexBin
+  3.58      0.52     0.02        1    20.03   109.26  addSeed
+  3.58      0.54     0.02                             sequence
+  1.79      0.55     0.01       15     0.67     2.00  func5
+  1.79      0.56     0.01        1    10.01    10.01  imdilateDisk
+  0.00      0.56     0.00   983042     0.00     0.00  round
+  0.00      0.56     0.00       16     0.00     0.00  dilateMatrix
+  0.00      0.56     0.00       15     0.00     0.00  func2
+  0.00      0.56     0.00       15     0.00     0.00  func3
+  0.00      0.56     0.00       15     0.00     0.00  func4
+  0.00      0.56     0.00       15     0.00     0.00  rand1
+  0.00      0.56     0.00        2     0.00     0.00  get_time
+  0.00      0.56     0.00        1     0.00     0.00  elapsed_time
+  0.00      0.56     0.00        1     0.00     0.00  fillMatrix
+  0.00      0.56     0.00        1     0.00     0.00  func0
+ ...
+=End=
+"(less) q" - quit less
+===End===
+
+===Memory setup===
+"make omp MTRACE=1" - memory trace compile
+"make checkmem" - check for memory leaks (must execute ./omp before this)
+===End===
+
+===Verify output===
+"make check" - if silent, is same output
+===End=
+
+===Changes to func.c===
+"vim func.c" - edit func.c
+"#pragma omp parallel for" - directive for creating multiple threads to execute a loop
+"#pragma omp parallel for private(a)" - directive for creating multiple threads to execute a loop with some private variable a
+"#pragma omp parallel for reduction("+:a)" - directive for creating multiple threads to execute a loop with accumulator 'a'
+"make omp GPROF=1" - compile with omp and GPROF
+=Modified= (Note: running ./omp multiple times reveals extreme variance in runtime)
+FUNC TIME : 0.045453
+TOTAL TIME : 1.903373
+=End=
+"gprof omp | less" - view gprof changes
+=less contents for modified func.c=
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  ms/call  ms/call  name    
+ 65.15      0.41     0.41                             filter
+ 23.83      0.56     0.15  4223481     0.00     0.00  rand2
+  7.94      0.61     0.05    10415     0.00     0.00  findIndexBin
+  1.59      0.62     0.01       16     0.63     0.63  dilateMatrix
+  1.59      0.63     0.01                             sequence
+  0.00      0.63     0.00    47396     0.00     0.00  round
+  0.00      0.63     0.00       15     0.00     0.00  func1
+  0.00      0.63     0.00       15     0.00     0.00  func2
+  0.00      0.63     0.00       15     0.00     0.00  func3
+  0.00      0.63     0.00       15     0.00     0.00  func4
+  0.00      0.63     0.00       15     0.00     0.00  func5
+  0.00      0.63     0.00       15     0.00     0.00  rand1
+  0.00      0.63     0.00        2     0.00     0.00  get_time
+  0.00      0.63     0.00        1     0.00   149.12  addSeed
+  0.00      0.63     0.00        1     0.00     0.00  elapsed_time
+  0.00      0.63     0.00        1     0.00     0.00  fillMatrix
+  0.00      0.63     0.00        1     0.00     0.00  func0
+  0.00      0.63     0.00        1     0.00     0.00  getNeighbors
+=End=
+"make check" - outputs nothing, which means the program still gives the same output
+"make checkmem" - outputs that there are memory leaks; these are expected problems with the program that are not directly related to what we are doing here and cannot be fixed feasibly
+Speedup = T1/T2 | 10 = 0.469670 / 0.045453 (these numbers may vary by as much as a magnitude due to the fact many people are running programs on the server, so results will vary)
+===End===
+
